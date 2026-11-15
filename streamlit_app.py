@@ -2395,8 +2395,11 @@ def page_explore():
     results = res["results"]
     if "sel_pending" in st.session_state:                     # a result pin was clicked on the globe
         st.session_state["sel_rank"] = st.session_state.pop("sel_pending")
-    sel = st.session_state.get("sel_rank", 1)
-    if sel > len(results):
+    try:                                                       # the widget can hand back text after the result list changes
+        sel = int(st.session_state.get("sel_rank", 1))
+    except (TypeError, ValueError):
+        sel = 1
+    if not 1 <= sel <= len(results):
         sel = st.session_state["sel_rank"] = 1
     r = results[sel - 1]
 
