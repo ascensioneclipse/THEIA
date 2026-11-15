@@ -2342,6 +2342,15 @@ def patch_figure(z, sal):
     return fig
 
 
+def is_phone() -> bool:
+    """Phone or small tablet, from the browser's user agent (used to size the 3-D globe)."""
+    try:
+        ua = st.context.headers.get("User-Agent", "")
+    except Exception:
+        return False
+    return bool(re.search(r"Mobi|Android|iPhone|iPod", ua))
+
+
 # ================================================================== EXPLORE
 def page_explore():
     targets = targets_as_dicts()
@@ -2392,32 +2401,33 @@ def page_explore():
     r = results[sel - 1]
 
     # ---------------- hero
-    h1, h2 = st.columns([2.1, 1.1], vertical_alignment="bottom")
-    h1.markdown(f"<div class='hero-title'>Earth analogs for <span class='place'>{target['name']}</span></div>"
+    st.markdown(f"<div class='hero-title'>Earth analogs for <span class='place'>{target['name']}</span></div>"
                 f"<div class='hero-sub'>Best 10 of {res['n_candidates']:,} Earth land patches · "
                 f"{'Custom weights' if custom else presets[pkey]['label']}</div>", unsafe_allow_html=True)
-    with h2:
-        c1, c2 = st.columns(2)
-        style = c1.segmented_control("Globe style", ["Hologram", "Satellite"], default="Hologram", key="gstyle") or "Hologram"
-        if picking:
-            st.session_state["view"] = "Target"
-        view = c2.segmented_control("Globe shows", ["Analogs", "Target"], default="Analogs", key="view") or "Analogs"
-    gstyle = "satellite" if style == "Satellite" else "holo"
+    phone = is_phone()
+    gh = 420 if phone else 600
 
     # ---------------- globe + side cards
     left, right = st.columns([1.75, 1], gap="medium")
     with left:
+        t1, t2, t3 = st.columns([1, 1, 1.3], vertical_alignment="bottom")
+        style = t1.segmented_control("Globe style", ["Hologram", "Satellite"], default="Hologram", key="gstyle") or "Hologram"
+        if picking:
+            st.session_state["view"] = "Target"
+        view = t2.segmented_control("Globe shows", ["Analogs", "Target"], default="Analogs", key="view") or "Analogs"
+        t3.markdown("<div class='toolbar-hint'>Drag to rotate · scroll to zoom · click a pin</div>", unsafe_allow_html=True)
+        gstyle = "satellite" if style == "Satellite" else "holo"
         with glass("globe"):
             if view == "Target":
                 click = globe(b, target={"name": target["name"], "lat": target["lat"], "lon": target["lon"]},
                               fly=(target["lat"], target["lon"], 5.2e6 if b == "moon" else 1.0e7), online=online, pick=picking,
-                              style=gstyle, height=640, key=f"globe_{b}")
+                              style=gstyle, height=gh, key=f"globe_{b}")
             else:
                 hk = st.session_state.get("heatkey")
                 click = globe("earth", results=[{"rank": x["rank"], "name": short_place(x), "lat": x["lat"], "lon": x["lon"]} for x in results],
                               selected=sel, known=analogs_as_dicts(), heat=heat_points(hk) if hk else None,
                               s2_url=s2_mosaic() if online and gstyle == "satellite" else None,
-                              fly=(r["lat"], r["lon"], 1.2e7), online=online, style=gstyle, height=640, key="globe_earth")
+                              fly=(r["lat"], r["lon"], 1.2e7), online=online, style=gstyle, height=gh, key="globe_earth")
         if click and click.get("t") != st.session_state.get("last_click"):
             st.session_state["last_click"] = click.get("t")
             if "rank" in click:
@@ -2481,7 +2491,7 @@ def page_explore():
                                 marker_color=[CYAN if e[i + 1] >= cut else "#1f3550" for i in range(len(h))])])
         fig.update_layout(**plot_layout(height=96, margin=dict(l=0, r=0, t=4, b=0), xaxis=dict(visible=False, range=[0, 100]),
                                         yaxis=dict(visible=False, type="log"), bargap=0.15))
-        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG, key="mini_hist")
+        st.plotly_chart(fig, width="stretch", config=PLOT_CFG, key="mini_hist")
         st.markdown("<div class='sub'>score distribution · cyan = the best 10</div>", unsafe_allow_html=True)
     with s2, glass("stat2"):
         agree = sum(1 for x in results if x["votes"] >= x["members"] - 1)
@@ -2521,15 +2531,15 @@ def page_explore():
                                 hovertemplate="%{y}<br>target %{customdata[0]} · Earth %{customdata[1]}<br>%{x:.2f} σ<extra></extra>")])
         fig.add_vrect(x0=-.5, x1=.5, fillcolor="rgba(111,224,176,.07)", line_width=0)
         fig.update_layout(**plot_layout(height=420, margin=dict(l=150, r=10, t=6, b=30), xaxis=dict(range=[-3.5, 3.5])))
-        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG, key="feat_chart")
+        st.plotly_chart(fig, width="stretch", config=PLOT_CFG, key="feat_chart")
     with w2, glass("sal"):
         st.markdown(f"<div class='lbl'><span>{dot(LAV)}What the networks looked at</span><span class='sub'>outline = terrain that mattered most</span></div>",
                     unsafe_allow_html=True)
         if "target_saliency" in ex:
             p1, p2 = st.columns(2)
-            p1.plotly_chart(patch_figure(ex["target_patch"], ex["target_saliency"]), use_container_width=True, config=PLOT_CFG, key="pt")
+            p1.plotly_chart(patch_figure(ex["target_patch"], ex["target_saliency"]), width="stretch", config=PLOT_CFG, key="pt")
             p1.markdown(f"<div style='text-align:center' class='place'>{target['name']}</div>", unsafe_allow_html=True)
-            p2.plotly_chart(patch_figure(ex["analog_patch"], ex["analog_saliency"]), use_container_width=True, config=PLOT_CFG, key="pa")
+            p2.plotly_chart(patch_figure(ex["analog_patch"], ex["analog_saliency"]), width="stretch", config=PLOT_CFG, key="pa")
             p2.markdown(f"<div style='text-align:center' class='place'>{short_place(r)}</div>", unsafe_allow_html=True)
             st.markdown("<div class='sub' style='margin-top:8px'>Each picture is 118 km across; colour is relative height. Hiding a 30 km "
                         "square inside the outline lowers the similarity the most.</div>", unsafe_allow_html=True)
@@ -2538,12 +2548,12 @@ def page_explore():
     with w3, glass("report"):
         st.markdown(f"<div class='lbl'><span>{dot()}Report</span></div><div class='sub' style='margin:6px 0 12px'>The ranked list with maps, "
                     "explanations, validation numbers and data citations.</div>", unsafe_allow_html=True)
-        if st.button("Prepare report", use_container_width=True):
+        if st.button("Prepare report", width="stretch"):
             st.session_state["report"] = build_report_bytes(b, target, weights, pkey, exclude_ice)
         if st.session_state.get("report"):
             zb, pdfb, stem = st.session_state["report"]
-            st.download_button("Download PDF", pdfb, f"{stem}.pdf", "application/pdf", use_container_width=True)
-            st.download_button("Markdown + figures", zb, f"{stem}.zip", "application/zip", use_container_width=True)
+            st.download_button("Download PDF", pdfb, f"{stem}.pdf", "application/pdf", width="stretch")
+            st.download_button("Markdown + figures", zb, f"{stem}.zip", "application/zip", width="stretch")
     st.session_state["last_match"] = res
 
 
@@ -2581,7 +2591,7 @@ def page_think():
                          go.Scatter(x=cur[:, 0], y=cur[:, 2] * 100, name="Twin found (%)", yaxis="y2", line=dict(color=LAV, width=2.5))])
         fig.update_layout(**plot_layout(height=470, xaxis=dict(title="training step"), yaxis=dict(title="loss"),
                                         yaxis2=dict(overlaying="y", side="right", range=[0, 100], title="twin found %", gridcolor="rgba(0,0,0,0)")))
-        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+        st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
         st.markdown(f"<div class='sub'>Network 1 of {len(log['members'])}: {cur[-1, 0]:.0f} steps, {m0['seconds'] / 60:.1f} min on a laptop CPU. "
                     "Twin found = how often it picks the right partner view out of hundreds of decoys (chance: under 1 %).</div>", unsafe_allow_html=True)
     with c2, glass("space"):
@@ -2605,7 +2615,7 @@ def page_think():
                                             steps=[dict(label=str(sn["step"]), method="animate",
                                                         args=[[str(sn["step"])], dict(mode="immediate", frame=dict(duration=0, redraw=True))])
                                                    for sn in snaps])])
-            st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+            st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
             st.markdown(f"<div class='sub'>900 fixed patches projected to 2-D at each stage of training. Body mixing at the end: "
                         f"{snaps[-1]['mixing']:.2f} (1 = Earth, Moon and Mars fully interleaved).</div>", unsafe_allow_html=True)
         else:
@@ -2625,7 +2635,7 @@ def page_think():
                                      text=[s["name"] for s in tg], hoverinfo="text",
                                      marker=dict(symbol="diamond", size=9, color=[BODY_COLOR[s["body"]] for s in tg], line=dict(color="#fff", width=1))))
             fig.update_layout(**plot_layout(height=470, xaxis=dict(visible=False), yaxis=dict(visible=False, scaleanchor="x"), margin=dict(l=4, r=4, t=30, b=4)))
-            st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+            st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
             st.markdown("<div class='sub'>Final fingerprint space of the whole ensemble, flattened with t-SNE (nearby = similar terrain). "
                         "Stars are Earth sites experts already use as analogs.</div>", unsafe_allow_html=True)
     c3, c4 = st.columns(2, gap="medium")
@@ -2639,7 +2649,7 @@ def page_think():
                                     marker_color=[CYAN if e[i + 1] >= cut else "#1f3550" for i in range(len(h))])])
             fig.update_layout(**plot_layout(height=340, xaxis=dict(title="match score (100 = identical)", range=[0, 100]),
                                             yaxis=dict(title="Earth patches", type="log")))
-            st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+            st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
             st.markdown(f"<div class='sub'>Every one of the {res['n_candidates']:,} Earth land patches gets a score; the cyan bars hold the best 10.</div>",
                         unsafe_allow_html=True)
         else:
@@ -2673,7 +2683,7 @@ def live_training():
             fig = go.Figure([go.Scatter(x=c[:, 0], y=c[:, 1], name="loss", line=dict(color=CYAN)),
                              go.Scatter(x=c[:, 0], y=c[:, 2] * 100, name="twin %", yaxis="y2", line=dict(color=LAV))])
             fig.update_layout(**plot_layout(height=260, yaxis2=dict(overlaying="y", side="right", range=[0, 100], gridcolor="rgba(0,0,0,0)")))
-            chart.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+            chart.plotly_chart(fig, width="stretch", config=PLOT_CFG)
     st.success(f"Done. A new network learned from scratch; twin-finding rose from chance to {curve[-1][2] * 100:.0f}% in {curve[-1][0]} steps.")
 
 
@@ -2708,7 +2718,7 @@ def page_validate():
         fig.add_vline(x=main["random_mean"], line_dash="dash", line_color=BAD, annotation_text="random", annotation_font_color=BAD)
         fig.update_layout(**plot_layout(height=520, margin=dict(l=300, r=30, t=20, b=40), xaxis=dict(range=[0, 108], title="mean site score"),
                                         yaxis=dict(autorange="reversed")))
-        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+        st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
     with c2, glass("sites"):
         st.markdown(f"<div class='lbl'><span>{dot()}Known sites, one by one</span></div>", unsafe_allow_html=True)
         sites = [s for s in main["sites"] if s["score"] is not None]
@@ -2718,7 +2728,7 @@ def page_validate():
                          go.Bar(orientation="h", y=ys, x=[bs[s["name"]] for s in sites], name="Baseline (raw features)", marker_color=LAV)])
         fig.update_layout(**plot_layout(height=520, barmode="group", margin=dict(l=200, r=10, t=30, b=40), xaxis=dict(range=[0, 100]),
                                         yaxis=dict(autorange="reversed")))
-        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+        st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
     c3, c4 = st.columns(2, gap="medium")
     with c3, glass("cal"):
         st.markdown(f"<div class='lbl'><span>{dot()}Is the uncertainty honest?</span></div>", unsafe_allow_html=True)
@@ -2727,7 +2737,7 @@ def page_validate():
                          go.Scatter(x=[x["expected"] for x in rel], y=[x["observed"] for x in rel], mode="lines+markers",
                                     name="AnalogNet ensemble", line=dict(color=CYAN, width=2.5), marker=dict(size=9))])
         fig.update_layout(**plot_layout(height=380, xaxis=dict(title="share of the other networks voting top-100"), yaxis=dict(title="held-out network agrees")))
-        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+        st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
         st.markdown("<div class='sub'>If 3 of 4 networks vote for a site, the 5th should agree about 75 % of the time. "
                     "Points below the line mean the votes are slightly over-confident.</div>", unsafe_allow_html=True)
     with c4, glass("probe"):
@@ -2736,7 +2746,7 @@ def page_validate():
         fr = sorted(P["feature_r2"].items(), key=lambda x: -x[1])
         fig = go.Figure([go.Bar(x=[FEATURE_NAMES.get(f, f) for f, _ in fr], y=[max(v, 0) for _, v in fr], marker_color=CYAN)])
         fig.update_layout(**plot_layout(height=380, yaxis=dict(range=[0, 1], title="R² read from fingerprint"), xaxis=dict(tickangle=-35), margin=dict(b=110)))
-        st.plotly_chart(fig, use_container_width=True, config=PLOT_CFG)
+        st.plotly_chart(fig, width="stretch", config=PLOT_CFG)
         st.markdown(f"<div class='sub'>Nobody told the network about relief, slope or craters, yet they can be read back from its fingerprint. "
                     f"Which world a patch is from can still be guessed {P['body_id_accuracy_embedding'] * 100:.0f}% of the time "
                     f"(raw features {P['body_id_accuracy_raw_features'] * 100:.0f}%, chance 33%).</div>", unsafe_allow_html=True)
@@ -2747,7 +2757,7 @@ def page_validate():
                     f"({T['lift']}× lift)." + (f" Shape-only preset: {TL['hit_rate'] * 100:.1f}% ({TL['lift']}× lift)." if TL else "") + "</div>",
                     unsafe_allow_html=True)
         st.dataframe([{"Target": x["target"], "Hits / 20": x["hits_in_top20"], "Top-5 Earth matches": "; ".join(x["examples"])}
-                      for x in T["per_target"]], hide_index=True, use_container_width=True)
+                      for x in T["per_target"]], hide_index=True, width="stretch")
     with glass("newc"):
         st.markdown(f"<div class='lbl'><span>{dot(LAV)}New candidate analogs, at least 300 km from every known site</span>"
                     "<span class='sub'>hypotheses for field validation</span></div>", unsafe_allow_html=True)
@@ -2758,7 +2768,7 @@ def page_validate():
                 st.markdown(f"**{title}**")
                 st.dataframe([{"Place": c["place"], "Lat": c["lat"], "Lon": c["lon"], "Score": round(c["score"], 2),
                                "Relief (m)": c["relief_m"], "Bare": f"{c['barefrac'] * 100:.0f}%"} for c in lst],
-                             hide_index=True, use_container_width=True)
+                             hide_index=True, width="stretch")
 
 
 # ================================================================== ABOUT
@@ -2786,7 +2796,7 @@ def page_about():
         st.markdown("#### Data sources (all open)")
         st.dataframe([{"Body": s["body"], "Variable": s["variable"], "Product": s["product"], "Licence": s["license"]} for s in SOURCES]
                      + [{"Body": s["body"], "Variable": "Globe imagery", "Product": s["what"], "Licence": s["license"]} for s in IMAGERY],
-                     hide_index=True, use_container_width=True)
+                     hide_index=True, width="stretch")
         with st.expander("Citations"):
             for s in SOURCES:
                 st.markdown(f"- {s['cite']}")
@@ -2797,7 +2807,7 @@ def page_about():
 def run_app() -> None:
     """The website: page settings, styling, navigation."""
     st.set_page_config(page_title="THEIA - Earth analogs for Moon & Mars bases", page_icon="static/brand/favicon.png",
-                       layout="wide", initial_sidebar_state="expanded")
+                       layout="wide", initial_sidebar_state="auto")
     st.markdown("""<style>
     @font-face { font-family: "Newsreader"; font-style: italic; font-weight: 500; src: url(app/static/fonts/newsreader-latin-500-italic.woff2) format("woff2"); }
     :root { --cyan: #5fd0ff; --lav: #b8acf0; --ink2: #9fb3cc; --ink3: #5f7591; --edge: rgba(95,208,255,.18); }
@@ -2809,23 +2819,27 @@ def run_app() -> None:
         repeating-linear-gradient(0deg, rgba(95,208,255,.035) 0 1px, transparent 1px 64px),
         repeating-linear-gradient(90deg, rgba(95,208,255,.035) 0 1px, transparent 1px 64px),
         #040811; }
-    [data-testid="stHeader"] { background: rgba(4,8,17,.55); backdrop-filter: blur(12px); border-bottom: 1px solid var(--edge); }
+    [data-testid="stHeader"] { background: rgba(4,8,17,.92); border-bottom: 1px solid var(--edge); }
     [data-testid="stMainBlockContainer"] { padding-top: 4.2rem; max-width: 1560px; }
     [data-testid="stSidebar"] { background: linear-gradient(180deg, rgba(10,20,38,.92), rgba(4,8,17,.94)); border-right: 1px solid var(--edge); }
 
     /* pill navigation */
-    [data-testid="stTopNavLink"] { border-radius: 999px !important; padding: 4px 16px !important; border: 1px solid transparent; transition: all .2s; }
+    [data-testid="stTopNavLink"] { border-radius: 999px !important; padding: 4px 16px !important; border: 1px solid transparent; transition: background .2s, border-color .2s; }
     [data-testid="stTopNavLink"]:hover { border-color: var(--edge); background: rgba(95,208,255,.06); }
     [data-testid="stTopNavLink"][aria-current="page"] { border-color: rgba(95,208,255,.55); background: rgba(95,208,255,.10);
         box-shadow: 0 0 18px rgba(95,208,255,.35), inset 0 0 12px rgba(95,208,255,.12); }
 
     /* glass cards: any container whose key starts with "glass" */
-    [class*="st-key-glass"] { background: linear-gradient(160deg, rgba(22,40,70,.55), rgba(6,12,24,.62)); border: 1px solid var(--edge);
-        border-radius: 22px; padding: 16px 18px 14px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 24px 60px -28px rgba(0,0,0,.9); }
+    /* "glass" look without backdrop-filter: blur is recomputed on every scroll and was the main cause of lag */
+    [class*="st-key-glass"] { background: linear-gradient(160deg, rgba(20,37,64,.88), rgba(7,13,26,.92)); border: 1px solid var(--edge);
+        border-radius: 22px; padding: 16px 18px 14px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 12px 28px -16px rgba(0,0,0,.9); }
     [class*="st-key-glassglobe"] { padding: 8px; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255,255,255,.06),
-        0 0 60px -10px rgba(60,160,255,.25), 0 30px 80px -30px rgba(0,0,0,.95); }
+        0 0 0 1px rgba(95,208,255,.10), 0 0 32px -8px rgba(60,160,255,.35); }
     [class*="st-key-glassglobe"] iframe { border-radius: 16px; }
+    [class*="st-key-glass"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }   /* last line was clipped */
+    [class*="st-key-glass"] { overflow: visible; }
+    [class*="st-key-glassglobe"] { overflow: hidden; }
 
     .place { font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 500; }
     .lbl { color: var(--ink2); font-size: .82rem; letter-spacing: .02em; display: flex; justify-content: space-between; align-items: center; }
@@ -2833,7 +2847,7 @@ def run_app() -> None:
     .big { font-size: 2.3rem; font-weight: 600; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
     .big small { font-size: .9rem; color: var(--ink2); font-weight: 400; margin-left: 6px; }
     .sub { color: var(--ink3); font-size: .8rem; }
-    .hero-title { font-size: 2.25rem; font-weight: 600; letter-spacing: -.015em; line-height: 1.15; margin: 0; }
+    .hero-title { font-size: clamp(1.45rem, .9rem + 1.5vw, 2.25rem); font-weight: 600; letter-spacing: -.015em; line-height: 1.15; margin: 0; }
     .hero-sub { color: var(--ink2); margin-top: 4px; }
     .chip { display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--edge); color: var(--ink2); font-size: .75rem; margin-right: 6px; }
     .chip.moon { border-color: rgba(201,204,214,.5); color: #dfe1e8; } .chip.mars { border-color: rgba(224,122,79,.6); color: #f0a07e; }
@@ -2866,6 +2880,27 @@ def run_app() -> None:
     .stButton button, .stDownloadButton button { border-radius: 999px !important; border: 1px solid rgba(95,208,255,.45) !important;
         background: rgba(95,208,255,.08) !important; box-shadow: 0 0 18px -6px rgba(95,208,255,.6); }
     .stButton button:hover, .stDownloadButton button:hover { background: rgba(95,208,255,.16) !important; }
+    .toolbar-hint { color: var(--ink3); font-size: .78rem; text-align: right; padding-top: 1.9rem; }
+
+    /* ---------- tablet */
+    @media (max-width: 1100px) {
+      [data-testid="stMainBlockContainer"] { padding-left: 1.2rem; padding-right: 1.2rem; }
+      .steps { grid-template-columns: repeat(2, 1fr); }
+      .toolbar-hint { display: none; }
+    }
+    /* ---------- phone */
+    @media (max-width: 640px) {
+      [data-testid="stMainBlockContainer"] { padding: 3.6rem .7rem 2rem; }
+      [class*="st-key-glass"] { border-radius: 16px; padding: 12px 12px 10px; }
+      [class*="st-key-glassglobe"] { padding: 4px; }
+      [class*="st-key-glassglobe"] iframe { border-radius: 12px; }
+      .big { font-size: 1.9rem; }
+      .hero-sub { font-size: .9rem; }
+      .steps { grid-template-columns: 1fr; }
+      .axis { grid-template-columns: 1fr 1.4fr 30px; font-size: .78rem; }
+      [data-testid="stTopNavLink"] { padding: 3px 10px !important; }
+      [data-testid="stSegmentedControl"] button { padding-left: 10px; padding-right: 10px; }
+    }
     </style>""", unsafe_allow_html=True)
     pg = st.navigation([st.Page(page_explore, title="Explore", icon=":material/public:", default=True),
                         st.Page(page_think, title="Watch the AI think", icon=":material/neurology:"),

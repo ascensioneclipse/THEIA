@@ -14,7 +14,9 @@
   background: rgba(17,25,40,.8); border: 1px solid rgba(196,210,235,.24); padding: 5px 10px; border-radius: 14px; display: none; }</style>
 </head><body><div id="g"></div><div id="hint"></div><script>
 "use strict";
-const STATIC = "/app/static/textures/";
+// Streamlit serves this page at <prefix>/component/...; on streamlit.app the prefix is "/~/+".
+// Build the texture address from that prefix so the tiles load both locally and in the cloud.
+const STATIC = location.pathname.split("/component/")[0] + "/app/static/textures/";
 let viewer = null, body = null, lastKey = null, cfg = null, heatPts = null;
 const GOLD = Cesium.Color.fromCssColorString("#5fd0ff");      // marker colour (cyan glow)
 const LAV = Cesium.Color.fromCssColorString("#b8acf0");       // THEIA lavender for the selected result
