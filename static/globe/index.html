@@ -1,0 +1,166 @@
+<!doctype html>
+<!-- AnalogNet globe as a Streamlit custom component.
+     Streamlit serves this folder from the app's own address, so CesiumJS and its web workers
+     load from the same origin (no CDN).  Talks to Python with Streamlit's postMessage protocol:
+       in : "streamlit:render"  {args: {cfg}}
+       out: "streamlit:componentReady", "streamlit:setFrameHeight", "streamlit:setComponentValue" -->
+<html><head><meta charset="utf-8">
+<script>window.CESIUM_BASE_URL = "cesium/";</script>
+<script src="cesium/Cesium.js"></script>
+<link rel="stylesheet" href="cesium/Widgets/widgets.css">
+<style>html, body, #g { margin: 0; height: 100%; width: 100%; background: #070b13; overflow: hidden; }
+.cesium-viewer-bottom, .cesium-infoBox { display: none !important; }
+#hint { position: absolute; left: 12px; top: 10px; z-index: 5; font: 12px "Instrument Sans", system-ui, sans-serif; color: #eef1f6;
+  background: rgba(17,25,40,.8); border: 1px solid rgba(196,210,235,.24); padding: 5px 10px; border-radius: 14px; display: none; }</style>
+</head><body><div id="g"></div><div id="hint"></div><script>
+"use strict";
+const STATIC = "/app/static/textures/";
+let viewer = null, body = null, lastKey = null, cfg = null, heatPts = null;
+const GOLD = Cesium.Color.fromCssColorString("#5fd0ff");      // marker colour (cyan glow)
+const LAV = Cesium.Color.fromCssColorString("#b8acf0");       // THEIA lavender for the selected result
+
+function send(type, data) { window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type }, data), "*"); }
+
+function heatColor(t) {
+  const s = [[0, [38, 64, 122]], [.3, [63, 143, 181]], [.55, [143, 214, 168]], [.8, [242, 220, 120]], [1, [239, 123, 108]]];
+  t = Math.max(0, Math.min(1, t));
+  for (let i = 1; i < s.length; i++) if (t <= s[i][0]) {
+    const f = (t - s[i - 1][0]) / (s[i][0] - s[i - 1][0]);
+    return new Cesium.Color(...s[i - 1][1].map((c, j) => (c + (s[i][1][j] - c) * f) / 255), 1);
+  }
+  return Cesium.Color.WHITE;
+}
+
+function build(b) {
+  if (viewer) viewer.destroy();
+  heatPts = null;
+  body = b;
+  const ell = b === "earth" ? Cesium.Ellipsoid.WGS84 : b === "moon" ? Cesium.Ellipsoid.MOON : Cesium.Ellipsoid.MARS;
+  Cesium.Ellipsoid.default = ell;
+  const holo = cfg.style !== "satellite";
+  // Every globe texture is a tile pyramid (512 px WebP tiles): only the tiles on screen at the
+  // current zoom are loaded, so zooming is instant and GPU memory stays small.
+  const folder = holo ? b + "_holo" : b;                         // earth / moon / mars or *_holo
+  const base = new Cesium.UrlTemplateImageryProvider({ url: STATIC + folder + "/{z}/{x}/{y}.webp",
+    tilingScheme: new Cesium.GeographicTilingScheme({ ellipsoid: ell }), maximumLevel: !holo && b === "earth" ? 4 : 3,
+    tileWidth: 512, tileHeight: 512,
+    credit: b === "earth" ? (holo ? "Hologram from NOAA ETOPO 2022" : "MODIS MCD43A4 via Microsoft Planetary Computer; NOAA ETOPO 2022")
+                          : (b === "moon" ? "LRO LOLA" : "MGS MOLA") });
+  viewer = new Cesium.Viewer("g", { baseLayer: new Cesium.ImageryLayer(base), baseLayerPicker: false, geocoder: false, homeButton: false,
+    sceneModePicker: false, navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false, infoBox: false,
+    selectionIndicator: false, terrainProvider: new Cesium.EllipsoidTerrainProvider({ ellipsoid: ell }), globe: new Cesium.Globe(ell),
+    skyAtmosphere: b === "earth" ? new Cesium.SkyAtmosphere() : false,
+    // Render only when something changes (camera move, tile arrives, pins update) instead of 60 times a second:
+    // near-zero GPU use when the globe is idle.
+    requestRenderMode: true, maximumRenderTimeChange: Infinity });
+  if (holo && viewer.scene.skyAtmosphere) { viewer.scene.skyAtmosphere.hueShift = -0.02; viewer.scene.skyAtmosphere.brightnessShift = 0.25; viewer.scene.skyAtmosphere.saturationShift = 0.2; }
+  const sc = viewer.scene;
+  sc.backgroundColor = Cesium.Color.fromCssColorString("#070b13");
+  sc.globe.showGroundAtmosphere = false; sc.fog.enabled = false; sc.globe.maximumScreenSpaceError = 2;
+  sc.globe.tileCacheSize = 400;                 // keep recently seen tiles: zooming back out is instant
+  sc.globe.preloadSiblings = true;              // fetch neighbouring tiles ahead of panning
+  sc.postProcessStages.fxaa.enabled = false;    // skip a full-screen anti-aliasing pass
+  sc.screenSpaceCameraController.inertiaZoom = 0.5;
+  if (sc.moon) sc.moon.show = b === "earth";
+  sc.globe.baseColor = Cesium.Color.fromCssColorString(holo ? "#030912" : b === "mars" ? "#6b3420" : b === "moon" ? "#55555c" : "#1d3557");
+  if (holo) { sc.skyBox.show = true; sc.sun.show = false; }
+  if (!holo && cfg.online && cfg.trek) {
+    const p = new Cesium.WebMapTileServiceImageryProvider({ url: cfg.trek, layer: "x", style: "default", tileMatrixSetID: "default028mm",
+      tilingScheme: new Cesium.GeographicTilingScheme({ ellipsoid: ell }), maximumLevel: 7, credit: "NASA Solar System Treks" });
+    const l = viewer.imageryLayers.addImageryProvider(p); l.alpha = 0.92;
+    p.errorEvent.addEventListener((e) => { if (e.timesRetried > 1) { e.retry = false; l.show = false; } });
+  }
+  if (!holo && cfg.online && cfg.s2 && b === "earth") {
+    const p = new Cesium.UrlTemplateImageryProvider({ url: cfg.s2, minimumLevel: 8, maximumLevel: 14, tilingScheme: new Cesium.WebMercatorTilingScheme(),
+      credit: "Sentinel-2 L2A (Copernicus) via Microsoft Planetary Computer" });
+    viewer.imageryLayers.addImageryProvider(p);
+    p.errorEvent.addEventListener((e) => { e.retry = e.timesRetried < 1; });
+  }
+  const h = new Cesium.ScreenSpaceEventHandler(sc.canvas);
+  h.setInputAction((ev) => {
+    const picked = sc.pick(ev.position);
+    if (picked && picked.id && picked.id.rank) { send("streamlit:setComponentValue", { value: { rank: picked.id.rank, t: Date.now() }, dataType: "json" }); return; }
+    if (cfg.pick && body !== "earth") {
+      const cart = viewer.camera.pickEllipsoid(ev.position, Cesium.Ellipsoid.default);
+      if (!cart) return;
+      const c = Cesium.Cartographic.fromCartesian(cart, Cesium.Ellipsoid.default);
+      send("streamlit:setComponentValue", { value: { lat: Cesium.Math.toDegrees(c.latitude), lon: Cesium.Math.toDegrees(c.longitude), t: Date.now() }, dataType: "json" });
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+}
+
+function pillar(lat, lon, color, km) {
+  viewer.entities.add({ polyline: { positions: Cesium.Cartesian3.fromDegreesArrayHeights([lon, lat, 0, lon, lat, km * 1000], Cesium.Ellipsoid.default),
+    width: 6, material: new Cesium.PolylineGlowMaterialProperty({ glowPower: 0.35, taperPower: 0.6, color: color.withAlpha(0.9) }) } });
+}
+function halo(lat, lon, color, size) {
+  viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, Cesium.Ellipsoid.default),
+    point: { pixelSize: size, color: color.withAlpha(0.22), disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+}
+function pin(lat, lon, text, color, size, extra) {
+  viewer.entities.add(Object.assign({ position: Cesium.Cartesian3.fromDegrees(lon, lat, 0, Cesium.Ellipsoid.default),
+    point: { pixelSize: size, color, outlineColor: Cesium.Color.BLACK, outlineWidth: 2, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+    label: text ? { text, font: "13px sans-serif", fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 3,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new Cesium.Cartesian2(10, -10), horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY, showBackground: true,
+      backgroundColor: Cesium.Color.fromCssColorString("rgba(11,15,23,0.75)") } : undefined }, extra || {}));
+}
+
+function draw() {
+  viewer.entities.removeAll();
+  if (heatPts && !heatPts.isDestroyed()) viewer.scene.primitives.remove(heatPts);   // only our layer, never Cesium's own
+  heatPts = null;
+  if (cfg.heat && cfg.heat.length) {
+    const pts = heatPts = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+    for (const [la, lo, s] of cfg.heat) if (s >= 60)
+      pts.add({ position: Cesium.Cartesian3.fromDegrees(lo, la), pixelSize: 3 + (s - 60) / 10, color: heatColor((s - 60) / 40).withAlpha(0.6),
+        disableDepthTestDistance: 5e6 });
+  }
+  for (const a of (cfg.known || [])) viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(a.lon, a.lat),
+    point: { pixelSize: 6, color: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK, outlineWidth: 1, disableDepthTestDistance: Number.POSITIVE_INFINITY } });
+  if (cfg.target) {
+    viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(cfg.target.lon, cfg.target.lat, 0, Cesium.Ellipsoid.default),
+      ellipse: { semiMajorAxis: 59000, semiMinorAxis: 59000, material: GOLD.withAlpha(0.15), outline: true, outlineColor: GOLD, height: 0 } });
+    halo(cfg.target.lat, cfg.target.lon, GOLD, 34);
+    pillar(cfg.target.lat, cfg.target.lon, GOLD, body === "moon" ? 160 : 300);
+    pin(cfg.target.lat, cfg.target.lon, cfg.target.name, GOLD, 12);
+    // a second, wider static ring (an animated pulse would force continuous rendering)
+    viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(cfg.target.lon, cfg.target.lat, 0, Cesium.Ellipsoid.default),
+      ellipse: { semiMajorAxis: 140000, semiMinorAxis: 140000, material: Cesium.Color.TRANSPARENT, outline: true, height: 0,
+        outlineColor: GOLD.withAlpha(0.45) } });
+  }
+  for (const r of (cfg.results || [])) {
+    const sel = r.rank === cfg.selected, col = sel ? LAV : GOLD;
+    halo(r.lat, r.lon, col, sel ? 34 : 22);
+    pillar(r.lat, r.lon, col, sel ? 650 : 280);
+    pin(r.lat, r.lon, r.rank + "  " + r.name, col, sel ? 13 : 9, { rank: r.rank });
+  }
+  viewer.scene.requestRender();                 // pins changed: draw one new frame
+  const hint = document.getElementById("hint");
+  hint.style.display = cfg.pick && body !== "earth" ? "block" : "none";
+  hint.textContent = "Click the " + (body === "moon" ? "Moon" : "Mars") + " to choose a site";
+}
+
+function render(c) {
+  const rebuild = !viewer || c.body !== body || c.online !== (cfg && cfg.online) || c.s2 !== (cfg && cfg.s2) || c.style !== (cfg && cfg.style);
+  cfg = c;
+  if (rebuild) build(c.body);
+  draw();
+  const f = c.fly || (c.body === "earth" ? [20, 10, 2.2e7] : [-30, 0, c.body === "moon" ? 6.5e6 : 1.25e7]);
+  const key = c.body + f.join(",");
+  if (key !== lastKey || rebuild) {                               // only move the camera when asked to look somewhere new
+    const dest = Cesium.Cartesian3.fromDegrees(f[1], f[0], f[2], Cesium.Ellipsoid.default);
+    if (rebuild) viewer.camera.setView({ destination: dest }); else viewer.camera.flyTo({ destination: dest, duration: 1.2 });
+    lastKey = key;
+  }
+}
+
+window.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "streamlit:render") {
+    const c = e.data.args.cfg;
+    send("streamlit:setFrameHeight", { height: c.height || 600 });
+    render(c);
+  }
+});
+send("streamlit:componentReady", { apiVersion: 1 });
+</script></body></html>

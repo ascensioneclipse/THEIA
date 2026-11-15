@@ -1,0 +1,10 @@
+.venv
+.git
+data
+dist
+build
+docs
+tests
+**/__pycache__
+*.zip
+static/textures/*.jpg

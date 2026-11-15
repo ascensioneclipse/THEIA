@@ -1,0 +1,35 @@
+[server]
+enableStaticServing = true      # serves ./static as /app/static (globe textures, fonts)
+headless = true
+fileWatcherType = "none"      # production: no code reloading
+maxUploadSize = 5
+
+[client]
+toolbarMode = "viewer"         # hide the developer menu (Stop / Deploy) from visitors
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#5fd0ff"
+backgroundColor = "#040811"
+secondaryBackgroundColor = "#0c1628"
+textColor = "#eaf3ff"
+font = "Instrument Sans"
+codeFont = "monospace"
+borderColor = "#1b3150"
+baseRadius = "8px"
+
+[[theme.fontFaces]]
+family = "Instrument Sans"
+url = "app/static/fonts/instrument-sans-latin-400-normal.woff2"
+weight = 400
+[[theme.fontFaces]]
+family = "Instrument Sans"
+url = "app/static/fonts/instrument-sans-latin-600-normal.woff2"
+weight = 600
+[[theme.fontFaces]]
+family = "Instrument Sans"
+url = "app/static/fonts/instrument-sans-latin-700-normal.woff2"
+weight = 700

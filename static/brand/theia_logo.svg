@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1024" role="img" aria-label="THEIA - Terrestrial Habitat Evaluation and Interplanetary Analogue">
+  <!-- THEIA logo, vector redraw. Transparent background; draw on dark. -->
+  <defs>
+    <linearGradient id="orbitA" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#b8acf0" stop-opacity="0"/><stop offset="0.45" stop-color="#cfc6f7" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#b8acf0" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="orbitB" x1="1" y1="0" x2="0" y2="0">
+      <stop offset="0" stop-color="#b8acf0" stop-opacity="0"/><stop offset="0.5" stop-color="#cfc6f7" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#b8acf0" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+  <!-- orbit: upper arc behind the word, lower arc under the tagline -->
+  <path d="M585 418 C 820 310, 1130 230, 1235 262 C 1290 280, 1245 345, 1215 383" fill="none" stroke="url(#orbitA)" stroke-width="7" stroke-linecap="round"/>
+  <path d="M640 660 C 470 700, 280 735, 232 690 C 195 652, 255 585, 305 543" fill="none" stroke="url(#orbitB)" stroke-width="8" stroke-linecap="round"/>
+  <!-- wordmark -->
+  <g fill="none" stroke="#f3f0ea" stroke-width="11" stroke-linecap="butt" stroke-linejoin="miter">
+    <path d="M285 405 H 435 M360 405 V 518"/>
+    <path d="M533 405 V 518 M673 405 V 518 M533 461 H 673"/>
+    <path d="M885 405 H 772 V 518 H 885 M772 461 H 875"/>
+    <path d="M1003 405 V 518"/>
+    <path d="M1100 518 L 1188 405 L 1276 518"/>
+  </g>
+  <!-- four-point star inside the A -->
+  <path d="M1182 463 C 1185 480, 1190 485, 1207 488 C 1190 491, 1185 496, 1182 515 C 1179 496, 1174 491, 1157 488 C 1174 485, 1179 480, 1182 463 Z" fill="#a99be8"/>
+  <!-- tagline -->
+  <g fill="#f3f0ea" font-family="Instrument Sans, Helvetica, Arial, sans-serif" font-size="27" letter-spacing="9.5" text-anchor="middle">
+    <text x="790" y="594">TERRESTRIAL HABITAT EVALUATION</text>
+    <text x="790" y="636">AND INTERPLANETARY ANALOGUE</text>
+  </g>
+</svg>

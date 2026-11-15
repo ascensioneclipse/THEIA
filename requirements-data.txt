@@ -1,0 +1,8 @@
+# Extra packages needed only to REBUILD the dataset from the original sources
+-r requirements.txt
+requests>=2.31
+tifffile>=2024.1
+imagecodecs>=2024.1
+zarr>=3.0
+pyshp>=2.3
+rasterio>=1.3
