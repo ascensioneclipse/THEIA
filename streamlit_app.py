@@ -2841,8 +2841,6 @@ def run_app() -> None:
         0 0 0 1px rgba(95,208,255,.10), 0 0 32px -8px rgba(60,160,255,.35); }
     [class*="st-key-glassglobe"] iframe { border-radius: 16px; }
     [class*="st-key-glass"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }   /* last line was clipped */
-    [class*="st-key-glass"] { overflow: visible; }
-    [class*="st-key-glassglobe"] { overflow: hidden; }
 
     .place { font-family: "Newsreader", Georgia, serif; font-style: italic; font-weight: 500; }
     .lbl { color: var(--ink2); font-size: .82rem; letter-spacing: .02em; display: flex; justify-content: space-between; align-items: center; }
