@@ -2143,7 +2143,7 @@ def build_report(eng, prof: dict, name: str, weights: dict, preset: str, exclude
           "## Data sources", ""]
     for s in SOURCES:
         L.append(f"- **{s['body']} - {s['variable']}:** {s['product']}. {s['agency']}. Licence: {s['license']}. {s['cite']}")
-    L += ["", "*AI disclosure: THEIA software was developed with the help of an AI coding assistant.*", ""]
+    L.append("")
     md = out / f"THEIA_{_slug(name)}.md"
     md.write_text("\n".join(L), encoding="utf-8")
 
@@ -2777,9 +2777,7 @@ def page_about():
 - Regional scale only (3.7 km pixels): rocks and metre-scale roughness are not seen.
 - No mineralogy layer for all three worlds yet; the lava-tube/cave purpose is planned.
 - Mars temperatures come from a climate model; MODIS measures Earth at 13:30 and 01:30.
-- New candidates are hypotheses for field checks.
-
-**AI disclosure:** this software was built with substantial help from an AI coding assistant.""")
+- New candidates are hypotheses for field checks.""")
     with c2, glass("data"):
         st.markdown("#### What is new, and what is not")
         st.write("Learned similarity by itself is not new: Meng et al. (2025, arXiv:2501.08584) trained an Earth–Mars image similarity "
